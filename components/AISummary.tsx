@@ -15,22 +15,21 @@ export function AISummary({ leads }: AISummaryProps) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
   const [error, setError] = useState("");
-  const [isLocalOnly, setIsLocalOnly] = useState(false);
+  const [provider, setProvider] = useState("");
 
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
     setSummary("");
+    setProvider("");
 
     const result = await generateAISummary(leads);
 
-    if (result.isLocalOnly) {
-      setIsLocalOnly(true);
-      setError(result.error || "");
-    } else if (result.error) {
+    if (result.error) {
       setError(result.error);
     } else if (result.text) {
       setSummary(result.text);
+      if (result.provider) setProvider(result.provider);
     }
 
     setLoading(false);
@@ -41,7 +40,7 @@ export function AISummary({ leads }: AISummaryProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-sta-cyan" />
-          Pipeline Summary — Ollama AI
+          Pipeline Summary — AI
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -71,13 +70,16 @@ export function AISummary({ leads }: AISummaryProps) {
         )}
 
         {error && (
-          <div className={`p-4 text-sm ${isLocalOnly ? "bg-[#E8F4FA] text-sta-navy" : "bg-red-50 text-red-700"}`}>
-            {error}
-          </div>
+          <div className="bg-red-50 p-4 text-sm text-red-700">{error}</div>
         )}
 
         {summary && (
           <div className="bg-[#F4F8FB] p-6">
+            {provider && (
+              <p className="mb-3 text-xs uppercase tracking-wider text-sta-teal">
+                Generated via {provider}
+              </p>
+            )}
             <div className="whitespace-pre-wrap text-sm leading-relaxed text-sta-navy">
               {summary}
             </div>

@@ -9,7 +9,8 @@ A production web application for managing STA's sponsor and lead pipeline. Built
 - **Tailwind CSS + shadcn/ui** — polished, accessible UI components
 - **Firebase Firestore** — free-tier NoSQL database for leads
 - **Firebase Auth** — Google sign-in for quick, secure access
-- **Ollama** — local AI summaries (development only, gracefully degrades in production)
+- **Google Gemini / Groq / OpenAI** — cloud AI summaries in production (via Vercel API route)
+- **Ollama** — optional local AI summaries during development
 - **Vercel** — hosting with automatic deployments from `main`
 
 ## Environment Variables
@@ -26,6 +27,19 @@ Copy `.env.example` to `.env.local` and fill in your values:
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
+
+| `NEXT_PUBLIC_GOOGLE_SHEETS_ID` | Google Sheet ID for live sponsor sync |
+
+### AI summaries (production on Vercel)
+
+| Variable | Description |
+|----------|-------------|
+| `GEMINI_API_KEY` | **Recommended** — free tier at [Google AI Studio](https://aistudio.google.com/apikey) |
+| `GROQ_API_KEY` | Optional — free tier at [console.groq.com](https://console.groq.com) |
+| `OPENAI_API_KEY` | Optional — paid at [platform.openai.com](https://platform.openai.com) |
+| `AI_PROVIDER` | Optional — `gemini`, `groq`, `openai`, or `auto` (default) |
+
+Server-side only — never use `NEXT_PUBLIC_` for API keys.
 
 ### Admin (required for migration script only)
 
@@ -137,14 +151,22 @@ Copy `.env.example` to `.env.local` and fill in your values:
 
    Open [http://localhost:3000](http://localhost:3000)
 
-7. **(Optional) AI summaries with Ollama**
+7. **(Optional) AI summaries**
 
+   **Local dev (free, private):**
    ```bash
    ollama serve
    ollama pull llama3
    ```
 
-   AI summaries only work on localhost. In production, the dashboard shows a friendly message instead.
+   **Production on Vercel (recommended — Google Gemini free tier):**
+   1. Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+   2. Vercel → **Settings** → **Environment Variables**
+   3. Add `GEMINI_API_KEY` = your key (Production, Preview, Development)
+   4. **Redeploy** the project
+   5. On the dashboard, click **Generate Summary** — it calls `/api/ai-summary` on Vercel
+
+   Locally, Ollama is tried first; if unavailable, the app falls back to the cloud API key in `.env.local`.
 
 ## Vercel Deployment
 
@@ -152,9 +174,12 @@ Copy `.env.example` to `.env.local` and fill in your values:
 2. Go to [vercel.com](https://vercel.com) and click **Add New Project**
 3. Import the `sta-lead-manager` repository
 4. Vercel auto-detects Next.js — no build config needed
-5. Add all `NEXT_PUBLIC_FIREBASE_*` environment variables from `.env.example` in the Vercel dashboard
+5. Add all environment variables from `.env.example`:
+   - All `NEXT_PUBLIC_FIREBASE_*` values
+   - `NEXT_PUBLIC_GOOGLE_SHEETS_ID`
+   - `GEMINI_API_KEY` (for AI summaries on the live site)
 6. Click **Deploy**
-7. Your app will be live at `https://sta-lead-manager.vercel.app` (or your chosen project name)
+7. After changing env vars, always **Redeploy** from the Deployments tab
 
 No manual configuration beyond environment variables is required.
 

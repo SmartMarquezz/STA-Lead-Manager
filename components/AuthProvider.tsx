@@ -1,7 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { onAuthChange, signInWithGoogle, User } from "@/lib/auth";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import {
+  onAuthChange,
+  signInWithGoogle,
+  signInWithGoogleRedirect,
+  completeGoogleRedirectSignIn,
+  getAuthErrorMessage,
+  User,
+} from "@/lib/auth";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { enableDemoMode, isDemoMode, disableDemoMode } from "@/lib/demo-data";
 import { StaLogo } from "@/components/StaLogo";
@@ -77,25 +84,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [demo, setDemo] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   useEffect(() => {
-    if (isDemoMode()) {
-      setDemo(true);
-      setUser(demoUserAsFirebaseUser);
-      setLoading(false);
-      return;
+    let unsubscribe = () => {};
+
+    async function initAuth() {
+      if (isDemoMode()) {
+        setDemo(true);
+        setUser(demoUserAsFirebaseUser);
+        setLoading(false);
+        return;
+      }
+
+      if (!isFirebaseConfigured()) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const redirectUser = await completeGoogleRedirectSignIn();
+        if (redirectUser) {
+          setUser(redirectUser);
+        }
+      } catch (error) {
+        setAuthError(getAuthErrorMessage(error));
+      }
+
+      unsubscribe = onAuthChange((u) => {
+        setUser(u);
+        setLoading(false);
+        if (u) setAuthError("");
+      });
     }
 
-    if (!isFirebaseConfigured()) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthChange((u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return unsubscribe;
+    initAuth();
+    return () => unsubscribe();
   }, []);
 
   const handleEnterDemo = () => {
@@ -103,6 +128,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDemo(true);
     setUser(demoUserAsFirebaseUser);
   };
+
+  const handleSignInPopup = useCallback(async () => {
+    setSigningIn(true);
+    setAuthError("");
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      setAuthError(getAuthErrorMessage(error));
+    } finally {
+      setSigningIn(false);
+    }
+  }, []);
+
+  const handleSignInRedirect = useCallback(async () => {
+    setSigningIn(true);
+    setAuthError("");
+    try {
+      await signInWithGoogleRedirect();
+    } catch (error) {
+      setAuthError(getAuthErrorMessage(error));
+      setSigningIn(false);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -120,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (
       <AuthScreen
         title="Lead Manager"
-        subtitle="Firebase is not configured yet. Explore the app with sample data, or add credentials to .env.local."
+        subtitle="Firebase is not configured yet. Explore the app with sample data, or add credentials to .env.local / Vercel."
       >
         <button className="sta-btn-primary w-full" onClick={handleEnterDemo}>
           Explore Demo
@@ -130,14 +178,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
+    const hostname =
+      typeof window !== "undefined" ? window.location.hostname : "localhost";
+
     return (
       <AuthScreen
         title="Sign In"
-        subtitle="Sign in with your Google account to access the sponsor pipeline."
+        subtitle="Sign in with your Google account to access the sponsor pipeline and sync live spreadsheet data."
       >
-        <button className="sta-btn-primary w-full" onClick={() => signInWithGoogle()}>
-          Sign In with Google
+        {authError && (
+          <div className="rounded border border-red-200 bg-red-50 p-3 text-left text-sm text-red-800">
+            {authError}
+          </div>
+        )}
+
+        <button
+          className="sta-btn-primary w-full disabled:opacity-60"
+          onClick={handleSignInPopup}
+          disabled={signingIn}
+        >
+          {signingIn ? "Signing in..." : "Sign In with Google"}
         </button>
+
+        <button
+          className="sta-btn-outline w-full disabled:opacity-60"
+          onClick={handleSignInRedirect}
+          disabled={signingIn}
+        >
+          Continue with redirect (if popup blocked)
+        </button>
+
+        <p className="text-center text-xs text-white/60">
+          Firebase must allow this domain: <strong className="text-white/80">{hostname}</strong>
+        </p>
+
         <button className="sta-btn-outline w-full" onClick={handleEnterDemo}>
           Explore Demo
         </button>
@@ -151,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <div className="min-h-screen bg-background">
           {demo && (
             <div className="bg-sta-navy px-4 py-2 text-center text-sm font-medium text-white">
-              Demo mode — sample data only.{" "}
+              Demo mode — showing sample data only. Google sign-in is required to sync your live spreadsheet.{" "}
               <button
                 className="font-bold underline"
                 onClick={() => {
@@ -161,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   window.location.reload();
                 }}
               >
-                Exit demo
+                Sign in with Google
               </button>
             </div>
           )}

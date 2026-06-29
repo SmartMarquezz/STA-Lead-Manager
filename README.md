@@ -82,10 +82,16 @@ Server-side only — never use `NEXT_PUBLIC_` for API keys.
 4. **Set up Firebase**
 
    - Create a project at [console.firebase.google.com](https://console.firebase.google.com)
-   - Enable **Firestore Database** (production mode, then add rules below)
-   - Enable **Authentication** → Google sign-in provider
+   - Enable **Firestore Database** (production mode, then deploy rules from `firestore.rules`)
+   - Enable **Authentication** → **Sign-in method** → **Google** → Enable → Save
    - Register a web app and copy config values to `.env.local`
-   - **No Firebase Storage required** — spreadsheet sync uses Google Drive or manual upload (free)
+   - **Authorized domains** (required for sign-in to work):
+     1. Firebase Console → **Authentication** → **Settings** → **Authorized domains**
+     2. Ensure these are listed (add any that are missing):
+        - `localhost`
+        - Your Vercel URL, e.g. `sta-lead-manager.vercel.app` (no `https://`)
+        - Any custom domain you use
+   - **No Firebase Storage required** — spreadsheet sync uses Google Sheets or manual upload (free)
 
    **Firestore rules:**
 

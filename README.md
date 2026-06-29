@@ -9,8 +9,8 @@ A production web application for managing STA's sponsor and lead pipeline. Built
 - **Tailwind CSS + shadcn/ui** — polished, accessible UI components
 - **Firebase Firestore** — free-tier NoSQL database for leads
 - **Firebase Auth** — Google sign-in for quick, secure access
-- **Google Gemini / Groq / OpenAI** — cloud AI summaries in production (via Vercel API route)
-- **Ollama** — optional local AI summaries during development
+- **Built-in pipeline summary** — free, always works (no API key)
+- **Groq / Ollama** — optional AI-enhanced summaries (free tiers)
 - **Vercel** — hosting with automatic deployments from `main`
 
 ## Environment Variables
@@ -30,16 +30,15 @@ Copy `.env.example` to `.env.local` and fill in your values:
 
 | `NEXT_PUBLIC_GOOGLE_SHEETS_ID` | Google Sheet ID for live sponsor sync |
 
-### AI summaries (production on Vercel)
+### AI summaries (optional)
 
 | Variable | Description |
 |----------|-------------|
-| `GEMINI_API_KEY` | **Recommended** — free tier at [Google AI Studio](https://aistudio.google.com/apikey) |
-| `GROQ_API_KEY` | Optional — free tier at [console.groq.com](https://console.groq.com) |
-| `OPENAI_API_KEY` | Optional — paid at [platform.openai.com](https://platform.openai.com) |
-| `AI_PROVIDER` | Optional — `gemini`, `groq`, `openai`, or `auto` (default) |
+| *(none required)* | **Built-in summary** runs automatically — 100% free, no setup |
+| `GROQ_API_KEY` | Optional — free tier at [console.groq.com](https://console.groq.com) for AI-enhanced text |
+| `AI_PROVIDER` | Optional — `groq`, `gemini`, `openai`, or `auto` (default) |
 
-Server-side only — never use `NEXT_PUBLIC_` for API keys.
+Remove `GEMINI_API_KEY` from Vercel if Google is asking for billing — the built-in summary does not need it.
 
 ### Admin (required for migration script only)
 
@@ -159,20 +158,13 @@ Server-side only — never use `NEXT_PUBLIC_` for API keys.
 
 7. **(Optional) AI summaries**
 
-   **Local dev (free, private):**
+   **Default (production + local):** Click **Generate Summary** on the dashboard — uses a **built-in free summary** from your pipeline data. No API key or billing required.
+
+   **Optional AI upgrade (free):**
    ```bash
-   ollama serve
-   ollama pull llama3
+   ollama serve && ollama pull llama3   # local dev only
    ```
-
-   **Production on Vercel (recommended — Google Gemini free tier):**
-   1. Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-   2. Vercel → **Settings** → **Environment Variables**
-   3. Add `GEMINI_API_KEY` = your key (Production, Preview, Development)
-   4. **Redeploy** the project
-   5. On the dashboard, click **Generate Summary** — it calls `/api/ai-summary` on Vercel
-
-   Locally, Ollama is tried first; if unavailable, the app falls back to the cloud API key in `.env.local`.
+   Or add `GROQ_API_KEY` from [console.groq.com](https://console.groq.com) in Vercel for AI-enhanced summaries (free tier, no credit card).
 
 ## Vercel Deployment
 
@@ -183,7 +175,7 @@ Server-side only — never use `NEXT_PUBLIC_` for API keys.
 5. Add all environment variables from `.env.example`:
    - All `NEXT_PUBLIC_FIREBASE_*` values
    - `NEXT_PUBLIC_GOOGLE_SHEETS_ID`
-   - `GEMINI_API_KEY` (for AI summaries on the live site)
+   - *(optional)* `GROQ_API_KEY` for AI-enhanced summaries — **do not add GEMINI_API_KEY** unless you have Google billing set up
 6. Click **Deploy**
 7. After changing env vars, always **Redeploy** from the Deployments tab
 

@@ -4,6 +4,7 @@ import {
   buildAISummaryPrompt,
   getStageColor,
 } from "./ai-prompt";
+import { generateLocalSummary } from "./local-summary";
 
 export { buildPipelineSummary, buildAISummaryPrompt, getStageColor };
 
@@ -29,16 +30,13 @@ async function generateWithOllama(prompt: string): Promise<{ text?: string; erro
     const data = await response.json();
     return { text: data.response || "No response generated." };
   } catch {
-    return {
-      error:
-        "Ollama is not running locally. Start it with 'ollama serve', or configure GEMINI_API_KEY on Vercel.",
-    };
+    return { error: "Ollama is not running locally." };
   }
 }
 
 async function generateWithCloudApi(
   summary: ReturnType<typeof buildPipelineSummary>
-): Promise<{ text?: string; error?: string }> {
+): Promise<{ text?: string; provider?: string; error?: string }> {
   const res = await fetch("/api/ai-summary", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -47,11 +45,11 @@ async function generateWithCloudApi(
 
   const data = await res.json();
 
-  if (!res.ok) {
+  if (!res.ok && !data.text) {
     return { error: data.error || `AI request failed (${res.status})` };
   }
 
-  return { text: data.text };
+  return { text: data.text, provider: data.provider };
 }
 
 export async function generateAISummary(leads: Lead[]): Promise<{
@@ -71,26 +69,20 @@ export async function generateAISummary(leads: Lead[]): Promise<{
   if (isLocalhost) {
     const ollamaResult = await generateWithOllama(prompt);
     if (ollamaResult.text) {
-      return { ...ollamaResult, provider: "Ollama (local)" };
+      return { ...ollamaResult, provider: "Ollama (local, free)" };
     }
   }
 
   const cloudResult = await generateWithCloudApi(summary);
   if (cloudResult.text) {
-    return { ...cloudResult, provider: "Cloud AI" };
-  }
-
-  if (isLocalhost) {
     return {
-      error:
-        cloudResult.error ||
-        "No AI available. Run 'ollama serve' locally, or add GEMINI_API_KEY to .env.local.",
+      text: cloudResult.text,
+      provider: cloudResult.provider || "Built-in (free)",
     };
   }
 
   return {
-    error:
-      cloudResult.error ||
-      "AI summary is not configured. Add GEMINI_API_KEY in Vercel → Settings → Environment Variables, then redeploy.",
+    text: generateLocalSummary(summary),
+    provider: "Built-in (free)",
   };
 }

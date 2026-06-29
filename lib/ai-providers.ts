@@ -134,13 +134,13 @@ export async function generateCloudSummary(prompt: string): Promise<GenerateResu
     return result;
   }
 
-  if (geminiKey) return generateWithGemini(prompt, geminiKey);
+  // Prefer Groq (free, no billing card). Gemini often requires prepaid credits.
   if (groqKey) return generateWithGroq(prompt, groqKey);
   if (openaiKey) return generateWithOpenAI(prompt, openaiKey);
+  if (geminiKey) return generateWithGemini(prompt, geminiKey);
 
   return {
-    error:
-      "No cloud AI provider configured. Add GEMINI_API_KEY (recommended, free tier) to Vercel environment variables.",
+    error: "No cloud AI provider configured.",
     status: 503,
   };
 }

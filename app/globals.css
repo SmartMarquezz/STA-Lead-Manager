@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 204 33% 97%;
+    --foreground: 213 68% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 213 68% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 68% 16%;
+    --primary: 199 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 204 40% 94%;
+    --secondary-foreground: 213 68% 16%;
+    --muted: 204 30% 94%;
+    --muted-foreground: 213 20% 45%;
+    --accent: 204 40% 94%;
+    --accent-foreground: 213 68% 16%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 204 25% 88%;
+    --input: 204 25% 88%;
+    --ring: 199 100% 45%;
+    --radius: 0.25rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .sta-hero {
+    @apply relative overflow-hidden text-white;
+    background: linear-gradient(
+      120deg,
+      #7ec8e3 0%,
+      #5aafd0 25%,
+      #3d8eb0 45%,
+      #1b4971 70%,
+      #0d2847 100%
+    );
+  }
+
+  .sta-hero-ripples {
+    @apply pointer-events-none absolute inset-0;
+    background:
+      radial-gradient(circle at 22% 55%, transparent 18%, rgba(255, 255, 255, 0.06) 18.5%, transparent 19%),
+      radial-gradient(circle at 22% 55%, transparent 28%, rgba(255, 255, 255, 0.05) 28.5%, transparent 29%),
+      radial-gradient(circle at 22% 55%, transparent 38%, rgba(255, 255, 255, 0.04) 38.5%, transparent 39%),
+      radial-gradient(circle at 22% 55%, transparent 48%, rgba(255, 255, 255, 0.03) 48.5%, transparent 49%),
+      radial-gradient(circle at 22% 55%, transparent 58%, rgba(255, 255, 255, 0.025) 58.5%, transparent 59%),
+      radial-gradient(circle at 22% 55%, transparent 68%, rgba(255, 255, 255, 0.02) 68.5%, transparent 69%);
+  }
+
+  .sta-panel {
+    background-color: rgba(13, 40, 71, 0.85);
+    backdrop-filter: blur(4px);
+  }
+
+  .sta-nav-link {
+    @apply text-sm font-normal tracking-wide text-sta-navy transition-colors hover:text-sta-cyan;
+  }
+
+  .sta-nav-link-active {
+    @apply font-bold text-sta-navy;
+  }
+
+  .sta-btn-primary {
+    @apply bg-sta-cyan px-8 py-3 text-sm font-bold uppercase tracking-wider text-white transition-colors hover:bg-sta-cyan-hover;
+  }
+
+  .sta-btn-outline {
+    @apply border-2 border-white/60 bg-transparent px-8 py-3 text-sm font-bold uppercase tracking-wider text-white transition-colors hover:bg-white/10;
+  }
+
+  .sta-section-title {
+    @apply text-xs font-bold uppercase tracking-[0.2em] text-sta-teal;
+  }
+
+  .sta-page-heading {
+    @apply text-2xl font-bold uppercase tracking-wide text-sta-navy md:text-3xl;
+  }
+
+  .sta-card {
+    @apply rounded-sm border border-[#D8E8F2] bg-white shadow-sta;
+  }
+
+  .sta-divider {
+    @apply h-px w-full bg-white/30;
+  }
+}

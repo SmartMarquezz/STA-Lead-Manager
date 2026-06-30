@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { getFirebaseDb } from "./firebase";
 import { isDemoMode, getDemoLeads, updateDemoLead, addDemoLead } from "./demo-data";
+import { normalizeFollowUpStatus } from "./follow-up";
 import {
   Lead,
   LeadInput,
@@ -23,9 +24,15 @@ import {
   derivePipelineStage,
   inferAssetBuckets,
   inferTags,
+  LeadStatus,
 } from "./types";
 
 const LEADS_COLLECTION = "leads";
+
+function followUpFromStatus(status?: LeadStatus | ""): Lead["followUpPriority"] {
+  if (!status) return "";
+  return normalizeFollowUpStatus(String(status));
+}
 
 function docToLead(id: string, data: Record<string, unknown>): Lead {
   return {
@@ -72,6 +79,8 @@ function docToLead(id: string, data: Record<string, unknown>): Lead {
     isSponsor: Boolean(data.isSponsor),
     declined: Boolean(data.declined),
     notes: (data.notes as Note[]) || [],
+    followUpPriority: (data.followUpPriority as Lead["followUpPriority"]) || "",
+    spreadsheetContacts: (data.spreadsheetContacts as Lead["spreadsheetContacts"]) || [],
   };
 }
 
@@ -298,6 +307,8 @@ export async function importLeads(
         paid: paidAmount > 0 || Boolean(input.paid),
         isSponsor: sponsorshipBucket === "Committed" || paidAmount > 0,
         declined: Boolean(input.declined) || input.status === "Declined",
+        followUpPriority: input.followUpPriority || followUpFromStatus(input.status),
+        spreadsheetContacts: input.spreadsheetContacts || [],
         pipelineStage:
           input.pipelineStage ||
           derivePipelineStage({ ...input, paid: paidAmount > 0 }),
@@ -378,6 +389,8 @@ function buildLeadDocument(input: Partial<LeadInput>, existingNotes?: Note[]) {
     paid: paidAmount > 0 || Boolean(input.paid),
     isSponsor: sponsorshipBucket === "Committed" || paidAmount > 0 || Boolean(input.isSponsor),
     declined: Boolean(input.declined) || input.status === "Declined",
+    followUpPriority: input.followUpPriority || followUpFromStatus(input.status),
+    spreadsheetContacts: input.spreadsheetContacts || [],
     pipelineStage:
       input.pipelineStage ||
       derivePipelineStage({ ...input, paid: paidAmount > 0 }),

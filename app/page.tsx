@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Users, Target, Award, DollarSign } from "lucide-react";
 import { PageHero } from "@/components/PageHero";
+import { FollowUpDashboard } from "@/components/FollowUpDashboard";
 import { StatsCard } from "@/components/StatsCard";
 import { AISummary } from "@/components/AISummary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +70,8 @@ export default function DashboardPage() {
       </PageHero>
 
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
+        <FollowUpDashboard leads={leads} />
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard title="Total Leads" value={stats.totalLeads} icon={Users} accent="sky" />
           <StatsCard title="Active Prospects" value={stats.activeProspects} icon={Target} accent="teal" />

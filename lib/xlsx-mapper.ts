@@ -1,13 +1,23 @@
 import * as XLSX from "xlsx";
 import {
+  applyFollowUpFromNotStartedSheet,
+  companyKey,
+  injectNotStartedOnlyLeads,
+  matchCompanyName,
+  normalizeFollowUpStatus,
+} from "./follow-up";
+import {
   derivePipelineStage,
   inferAssetBuckets,
   inferTags,
   LeadInput,
+  Contact,
 } from "./types";
 
 export const XLSX_STORAGE_PATH = "STA-Sponsors.xlsx";
 export const XLSX_SHEET_NAME = "2026 Sponsors";
+export const NOT_STARTED_SHEET_NAMES = ["Not Started", "Not started", "NOT STARTED"];
+export const HUBSPOT_SHEET_NAMES = ["HubSpot - General", "HubSpot - OIC"];
 
 export function parseNumber(val: unknown): number {
   if (val === null || val === undefined || val === "") return 0;
@@ -31,21 +41,111 @@ export function findColumn(row: Record<string, unknown>, ...names: string[]): un
   return "";
 }
 
+function parseHubSpotContactRow(row: Record<string, unknown>): Contact | null {
+  const first = parseString(findColumn(row, "First Name", "First name"));
+  const last = parseString(findColumn(row, "Last Name", "Last name"));
+  const email = parseString(findColumn(row, "Email", "Email Address"));
+  const company = parseString(findColumn(row, "Company", "Firm", "Company Name"));
+  const title = parseString(findColumn(row, "Title"));
+
+  if (!email || !company) return null;
+
+  return {
+    name: [first, last].filter(Boolean).join(" ") || email.split("@")[0],
+    email,
+    title: title || undefined,
+    source: "xlsx-hubspot-tab",
+  };
+}
+
+export function parseHubSpotSheets(workbook: XLSX.WorkBook): Map<string, Contact[]> {
+  const byCompany = new Map<string, Contact[]>();
+
+  for (const sheetName of workbook.SheetNames) {
+    if (!HUBSPOT_SHEET_NAMES.some((n) => n.toLowerCase() === sheetName.toLowerCase())) {
+      continue;
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+    for (const row of rows) {
+      const contact = parseHubSpotContactRow(row);
+      if (!contact) continue;
+
+      const company = parseString(findColumn(row, "Company", "Firm", "Company Name"));
+      const key = companyKey(company);
+      const list = byCompany.get(key) || [];
+      const exists = list.some((c) => c.email.toLowerCase() === contact.email.toLowerCase());
+      if (!exists) list.push(contact);
+      byCompany.set(key, list);
+    }
+  }
+
+  return byCompany;
+}
+
+export function parseNotStartedSheet(workbook: XLSX.WorkBook): Set<string> {
+  const companies = new Set<string>();
+
+  for (const sheetName of workbook.SheetNames) {
+    if (!NOT_STARTED_SHEET_NAMES.some((n) => n.toLowerCase() === sheetName.toLowerCase())) {
+      continue;
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+    for (const row of rows) {
+      const company = parseString(
+        findColumn(row, "Company", "Company Name", "Firm", "Company_1")
+      );
+      if (company) companies.add(company);
+    }
+  }
+
+  return companies;
+}
+
+function attachSpreadsheetContacts(
+  lead: Partial<LeadInput>,
+  hubspotByCompany: Map<string, Contact[]>
+): Partial<LeadInput> {
+  const key = companyKey(lead.companyName || "");
+  let extra = hubspotByCompany.get(key) || [];
+
+  if (extra.length === 0) {
+    for (const [companyKeyName, contacts] of Array.from(hubspotByCompany.entries())) {
+      if (matchCompanyName(lead.companyName || "", companyKeyName)) {
+        extra = contacts;
+        break;
+      }
+    }
+  }
+
+  if (extra.length === 0) return lead;
+  return { ...lead, spreadsheetContacts: extra };
+}
+
 export function mapRowToLead(row: Record<string, unknown>): Partial<LeadInput> {
-  const companyName = parseString(findColumn(row, "Company Name", "Company", "company name"));
+  const companyName = parseString(findColumn(row, "Company Name", "Company", "company name", "Firm"));
   const sponsorshipBucket = parseString(findColumn(row, "Sponsorship Bucket", "Bucket"));
   const status = parseString(findColumn(row, "Status"));
   const owner = parseString(findColumn(row, "Owner"));
   const internalNotes = parseString(findColumn(row, "Internal Notes", "Notes", "internal notes"));
   const level2026 = parseString(findColumn(row, "2026 Level", "Level 2026"));
   const amount2026 = parseNumber(findColumn(row, "2026 Amount", "Amount 2026"));
-  const invoiceSentDate = parseString(findColumn(row, "Invoice Sent date", "Invoice Sent Date"));
+  const invoiceSentDate = parseString(findColumn(row, "Invoice Sent date", "Invoice Sent Date", "Invoice Sent"));
   const paidAmount = parseNumber(findColumn(row, "Paid amount", "Paid Amount", "Paid"));
-  const outstandingAmount = parseNumber(findColumn(row, "Outstanding amount", "Outstanding Amount", "Outstanding"));
+  const outstandingAmount = parseNumber(
+    findColumn(row, "Outstanding amount", "Outstanding Amount", "Outstanding")
+  );
   const level2025 = parseString(findColumn(row, "2025 Level", "Level 2025"));
   const amount2025 = parseNumber(findColumn(row, "2025 Amount", "Amount 2025"));
-  const delta2625 = parseNumber(findColumn(row, "26 vs 25 delta", "Delta", "26 vs 25"));
-  const jumpBallAmount = parseNumber(findColumn(row, "Jump Ball amount", "Jump Ball"));
+  const delta2625 = parseNumber(findColumn(row, "26 vs 25 delta", "Delta", "26 vs 25", "26 vs '25"));
+  const jumpBallAmount = parseNumber(findColumn(row, "Jump Ball amount", "Jump Ball", "Jump Ball "));
   const slaSentTo = parseString(findColumn(row, "SLA Sent To"));
   const invoiceSentTo = parseString(findColumn(row, "Invoice Sent To"));
 
@@ -78,11 +178,13 @@ export function mapRowToLead(row: Record<string, unknown>): Partial<LeadInput> {
   const paid = paidAmount > 0;
   const isSponsor = sponsorshipBucket === "Committed" || paid;
   const invoiceSent = Boolean(invoiceSentDate);
-  const reachedOut = status === "Sent email";
+  const statusLower = status.toLowerCase();
+  const reachedOut = statusLower === "sent email" || status === "Sent Email";
   const responded = status === "Replied";
   const meetingHeld = status === "In Progress";
   const offerSent = status === "Hot";
   const declined = status === "Declined";
+  const followUpPriority = normalizeFollowUpStatus(status);
 
   const input: Partial<LeadInput> = {
     companyName,
@@ -117,6 +219,7 @@ export function mapRowToLead(row: Record<string, unknown>): Partial<LeadInput> {
     paid,
     isSponsor,
     declined,
+    followUpPriority,
     tags: [],
   };
 
@@ -131,8 +234,17 @@ export function parseXlsxBuffer(buffer: ArrayBuffer): Partial<LeadInput>[] {
   const sheet = workbook.Sheets[XLSX_SHEET_NAME] || workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) return [];
 
+  const hubspotByCompany = parseHubSpotSheets(workbook);
+  const notStartedCompanies = parseNotStartedSheet(workbook);
+
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-  return rows
+  let leads = rows
     .map(mapRowToLead)
-    .filter((l) => l.companyName?.trim());
+    .filter((l) => l.companyName?.trim())
+    .map((l) => attachSpreadsheetContacts(l, hubspotByCompany));
+
+  leads = applyFollowUpFromNotStartedSheet(leads, notStartedCompanies);
+  leads = injectNotStartedOnlyLeads(leads, notStartedCompanies, hubspotByCompany);
+
+  return leads;
 }

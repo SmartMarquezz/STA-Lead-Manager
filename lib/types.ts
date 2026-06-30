@@ -26,14 +26,28 @@ export type LeadStatus =
   | "Hot"
   | "In Progress"
   | "Sent email"
+  | "Sent Email"
+  | "Not Started"
   | "Replied"
   | "Committed"
   | "Declined"
   | "";
 
+/** Priority buckets for Jim's follow-up dashboard (from STATUS column + Not Started sheet) */
+export type FollowUpPriority = "Not Started" | "Hot" | "In Progress" | "Sent Email";
+
+export const FOLLOW_UP_PRIORITIES: FollowUpPriority[] = [
+  "Not Started",
+  "Hot",
+  "In Progress",
+  "Sent Email",
+];
+
 export interface Contact {
   name: string;
   email: string;
+  title?: string;
+  source?: "spreadsheet" | "hubspot" | "xlsx-hubspot-tab";
 }
 
 export interface Note {
@@ -90,6 +104,10 @@ export interface Lead {
   isSponsor: boolean;
   declined?: boolean;
   notes?: Note[];
+  /** Follow-up bucket derived from STATUS column or Not Started sheet */
+  followUpPriority?: FollowUpPriority | "";
+  /** Extra contacts parsed from HubSpot tabs in the spreadsheet */
+  spreadsheetContacts?: Contact[];
 }
 
 export type LeadInput = Omit<Lead, "id" | "createdAt" | "updatedAt">;
